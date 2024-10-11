@@ -2,6 +2,8 @@ defmodule ElixirChatWeb.RoomLive do
   use ElixirChatWeb, :live_view
   require Logger
 
+  alias ElixirChat.OpenaiChat
+
   @spec mount(map(), any(), Phoenix.LiveView.Socket.t()) :: {:ok, any()}
   def mount(%{"id" => room_id}, _session, socket) do
     user = MnemonicSlugs.generate_slug()
@@ -34,20 +36,35 @@ defmodule ElixirChatWeb.RoomLive do
     {:ok, stream(socket, :messages, [])}
   end
 
-  def handle_event("submit_message", %{"message" => message}, socket) do
-    meesage_submitted = "Current message #{message} "
-    Logger.info(meesage_submitted)
+  def handle_event("submit_message", %{"message" => message_content}, socket) do
+  message_submitted = "Current message #{message_content} "
+  Logger.info(message_submitted)
 
-    message = %{
-      id: UUID.uuid4(),
-      content: message,
-      user: socket.assigns.user,
-      svg_text: socket.assigns.svg_text
-    }
+  user_message = %{
+    id: UUID.uuid4(),
+    content: message_content,
+    user: socket.assigns.user,
+    svg_text: socket.assigns.svg_text
+  }
 
-    ElixirChatWeb.Endpoint.broadcast(socket.assigns.topic, "new-message", message)
-    {:noreply, socket}
-  end
+  ElixirChatWeb.Endpoint.broadcast(socket.assigns.topic, "new-message", user_message)
+
+  {:ok, response} = OpenaiChat.send_message_to_openai(message_content)
+  IO.inspect(response)
+
+  # Create a new message for the assistant's response
+  assistant_message = %{
+    id: UUID.uuid4(),
+    content: response,  # Assuming the response is a string
+    user: "Assistant",  # The user is now the assistant
+    svg_text: socket.assigns.svg_text
+  }
+
+  # Broadcast the assistant's message
+  ElixirChatWeb.Endpoint.broadcast(socket.assigns.topic, "new-message", assistant_message)
+
+  {:noreply, socket}
+end
 
   def handle_info(%{event: "new-message", payload: payload, topic: _topic}, socket) do
     {:noreply,

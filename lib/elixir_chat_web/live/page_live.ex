@@ -13,4 +13,6 @@ defmodule ElixirChatWeb.PageLive do
     {:noreply, push_navigate(socket, to: random_slug)}
   end
 
+  
+
 end
